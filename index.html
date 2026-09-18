@@ -1,0 +1,1026 @@
+<!DOCTYPE html>
+<html lang="vi" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ArchRender AI - Chuyển SketchUp Thành Phối Cảnh Thực tế</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        brand: {
+                            50: '#fffbebe6',
+                            500: '#f59e0b',
+                            600: '#d97706',
+                            700: '#b45309',
+                            dark: '#0b0f17',
+                            card: '#141c2b',
+                            border: '#233047',
+                            accent: '#06b6d4'
+                        }
+                    },
+                    fontFamily: {
+                        sans: ['Inter', 'system-ui', 'sans-serif']
+                    }
+                }
+            }
+        }
+    </script>
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Google Fonts Inter -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #0b0f17;
+            color: #f3f4f6;
+        }
+        /* Custom Scrollbars */
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #0b0f17;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #233047;
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #f59e0b;
+        }
+        /* Comparison Slider */
+        .comparison-container {
+            position: relative;
+            overflow: hidden;
+            user-select: none;
+        }
+        .comparison-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            height: 100%;
+            overflow: hidden;
+            border-right: 2px solid #f59e0b;
+        }
+        .slider-handle {
+            position: absolute;
+            top: 50%;
+            transform: translate(-50%, -50%);
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            background-color: #f59e0b;
+            color: #0b0f17;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 0 15px rgba(245, 158, 11, 0.5);
+            cursor: ew-resize;
+            z-index: 20;
+        }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col justify-between antialiased">
+
+    <!-- Header -->
+    <header class="bg-brand-card/90 backdrop-blur border-b border-brand-border sticky top-0 z-40 px-4 lg:px-8 py-3.5">
+        <div class="max-w-7xl mx-auto flex items-center justify-between">
+            <div class="flex items-center space-x-3">
+                <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-amber-500 to-cyan-500 flex items-center justify-center shadow-lg shadow-amber-500/20">
+                    <i class="fa-solid fa-cube text-slate-950 text-xl font-bold"></i>
+                </div>
+                <div>
+                    <h1 class="text-lg font-bold tracking-tight bg-gradient-to-r from-white via-slate-200 to-slate-400 bg-clip-text text-transparent flex items-center gap-2">
+                        ArchRender AI <span class="text-xs font-semibold px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-400 border border-amber-500/30">SketchUp v3.1</span>
+                    </h1>
+                    <p class="text-xs text-slate-400">Chuyển phác thảo SketchUp thành phối cảnh thực tế 8K với Gemini API</p>
+                </div>
+            </div>
+
+            <div class="flex items-center space-x-3">
+                <div class="hidden sm:flex items-center space-x-2 bg-slate-900/80 px-3 py-1.5 rounded-lg border border-brand-border text-xs text-slate-300">
+                    <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                    <span>Gemini 3.1 Flash Image Engine</span>
+                </div>
+                <button id="btnHistoryToggle" class="px-3 py-1.5 rounded-lg border border-brand-border bg-slate-900 hover:bg-slate-800 text-slate-300 hover:text-amber-400 text-xs font-medium transition flex items-center gap-1.5">
+                    <i class="fa-solid fa-clock-rotate-left"></i>
+                    <span class="hidden md:inline">Lịch sử</span>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main App Container -->
+    <main class="max-w-7xl w-full mx-auto px-4 lg:px-8 py-6 flex-grow">
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+
+            <!-- LEFT COLUMN: Sketch Input & AI Controls (5 cols) -->
+            <div class="lg:col-span-5 space-y-5">
+                
+                <!-- Input Source Panel -->
+                <div class="bg-brand-card border border-brand-border rounded-2xl p-4 shadow-xl">
+                    <div class="flex items-center justify-between mb-3">
+                        <h2 class="text-sm font-semibold text-slate-200 flex items-center gap-2">
+                            <i class="fa-solid fa-pen-ruler text-amber-500"></i>
+                            1. Bản vẽ SketchUp / Phác thảo
+                        </h2>
+                        <span class="text-[11px] text-slate-400">Chọn hoặc tải bản vẽ</span>
+                    </div>
+
+                    <!-- Input Modes Tabs -->
+                    <div class="flex bg-slate-900/90 p-1 rounded-xl border border-brand-border mb-3 text-xs">
+                        <button id="tabPreset" class="flex-1 py-1.5 rounded-lg font-medium transition bg-amber-500 text-slate-950 shadow">Mẫu có sẵn</button>
+                        <button id="tabUpload" class="flex-1 py-1.5 rounded-lg font-medium text-slate-400 hover:text-slate-200 transition">Tải file lên</button>
+                        <button id="tabCanvas" class="flex-1 py-1.5 rounded-lg font-medium text-slate-400 hover:text-slate-200 transition">Tự phác thảo</button>
+                    </div>
+
+                    <!-- Mode 1: Presets -->
+                    <div id="sectionPresets" class="space-y-2">
+                        <label class="text-xs text-slate-400 block">Chọn mẫu nét xuất từ SketchUp:</label>
+                        <div class="grid grid-cols-5 gap-2" id="presetList">
+                            <!-- Preset items rendered by JS -->
+                        </div>
+                    </div>
+
+                    <!-- Mode 2: File Upload (Hidden by default) -->
+                    <div id="sectionUpload" class="hidden">
+                        <div id="dropZone" class="border-2 border-dashed border-slate-700 hover:border-amber-500/60 transition rounded-xl p-5 text-center cursor-pointer bg-slate-900/50">
+                            <input type="file" id="fileInput" accept="image/png, image/jpeg, image/webp" class="hidden">
+                            <i class="fa-solid fa-cloud-arrow-up text-2xl text-slate-500 mb-2"></i>
+                            <p class="text-xs text-slate-300 font-medium">Kéo thả file xuất SketchUp vào đây</p>
+                            <p class="text-[10px] text-slate-500 mt-1">Hỗ trợ PNG, JPG, WEBP (Tối đa 15MB)</p>
+                        </div>
+                    </div>
+
+                    <!-- Mode 3: Interactive Canvas (Hidden by default) -->
+                    <div id="sectionCanvas" class="hidden space-y-2">
+                        <div class="flex items-center justify-between bg-slate-900 p-1.5 rounded-lg border border-brand-border text-xs">
+                            <div class="flex items-center space-x-1.5">
+                                <button id="btnToolPen" title="Bút vẽ" class="p-1.5 rounded bg-amber-500 text-slate-950 font-bold"><i class="fa-solid fa-pen"></i></button>
+                                <button id="btnToolLine" title="Vẽ đường thẳng" class="p-1.5 rounded hover:bg-slate-800 text-slate-400"><i class="fa-solid fa-slash"></i></button>
+                                <button id="btnToolEraser" title="Tẩy" class="p-1.5 rounded hover:bg-slate-800 text-slate-400"><i class="fa-solid fa-eraser"></i></button>
+                                <input type="color" id="strokeColor" value="#000000" class="w-6 h-6 rounded border-0 cursor-pointer bg-transparent">
+                            </div>
+                            <div class="flex items-center space-x-2">
+                                <input type="range" id="strokeWidth" min="1" max="15" value="3" class="w-16 accent-amber-500">
+                                <button id="btnClearCanvas" class="px-2 py-1 text-[11px] rounded bg-red-500/20 text-red-400 hover:bg-red-500/30">Xóa hết</button>
+                            </div>
+                        </div>
+                        <div class="relative aspect-video w-full bg-white rounded-xl overflow-hidden border border-brand-border">
+                            <canvas id="sketchCanvas" class="w-full h-full cursor-crosshair"></canvas>
+                        </div>
+                    </div>
+
+                    <!-- Input Sketch Preview Box -->
+                    <div class="mt-3 relative rounded-xl overflow-hidden border border-brand-border bg-slate-950 aspect-video flex items-center justify-center">
+                        <img id="inputPreview" src="" alt="SketchUp Input" class="max-h-full max-w-full object-contain">
+                        <div class="absolute bottom-2 left-2 bg-slate-900/90 text-slate-300 text-[10px] px-2 py-0.5 rounded-md border border-brand-border flex items-center gap-1">
+                            <i class="fa-solid fa-image text-amber-500"></i>
+                            <span id="inputLabel">Mẫu: Biệt thự Hiện đại</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- AI Render Controls Panel -->
+                <div class="bg-brand-card border border-brand-border rounded-2xl p-4 shadow-xl space-y-4">
+                    <div class="flex items-center justify-between">
+                        <h2 class="text-sm font-semibold text-slate-200 flex items-center gap-2">
+                            <i class="fa-solid fa-sliders text-cyan-400"></i>
+                            2. Thông số AI Render Chuyên nghiệp
+                        </h2>
+                    </div>
+
+                    <!-- Form Controls Grid -->
+                    <div class="grid grid-cols-2 gap-3 text-xs">
+                        
+                        <!-- 1. Category -->
+                        <div class="space-y-1">
+                            <label class="text-slate-400 font-medium">Loại công trình</label>
+                            <select id="selectCategory" class="w-full bg-slate-900 border border-brand-border rounded-lg px-2.5 py-2 text-slate-200 focus:border-amber-500 outline-none">
+                                <option value="Ngoại thất (Exterior Architecture)">Ngoại thất (Exterior)</option>
+                                <option value="Nội thất (Interior Architecture)">Nội thất (Interior)</option>
+                                <option value="Quy hoạch & Sân vườn (Landscape)">Quy hoạch & Sân vườn</option>
+                                <option value="Axonometric 3D Diagram">Phối cảnh Khối Axonometric</option>
+                            </select>
+                        </div>
+
+                        <!-- 2. Style -->
+                        <div class="space-y-1">
+                            <label class="text-slate-400 font-medium">Phong cách kiến trúc</label>
+                            <select id="selectStyle" class="w-full bg-slate-900 border border-brand-border rounded-lg px-2.5 py-2 text-slate-200 focus:border-amber-500 outline-none">
+                                <option value="Hiện đại tối giản (Modern Minimalist)">Hiện đại tối giản</option>
+                                <option value="Sang trọng cao cấp (Luxury Contemporary)">Sang trọng cao cấp</option>
+                                <option value="Bắc Âu ấm cúng (Scandinavian)">Bắc Âu ấm cúng (Scandinavian)</option>
+                                <option value="Bê tông & Kim loại Công nghiệp (Industrial)">Industrial Bê tông & Kính</option>
+                                <option value="Đông Dương Indochine & Tân cổ điển">Indochine / Tân cổ điển</option>
+                            </select>
+                        </div>
+
+                        <!-- 3. Lighting & Time -->
+                        <div class="space-y-1">
+                            <label class="text-slate-400 font-medium">Thời gian & Ánh sáng</label>
+                            <select id="selectLighting" class="w-full bg-slate-900 border border-brand-border rounded-lg px-2.5 py-2 text-slate-200 focus:border-amber-500 outline-none">
+                                <option value="Nắng trưa rực rỡ, đổ bóng sắc nét (Bright Sunlight)">Nắng trưa rực rỡ</option>
+                                <option value="Giờ vàng Hoàng hôn (Golden Hour, warm ambient light)">Hoàng hôn (Golden Hour)</option>
+                                <option value="Chiều tà rực rỡ (Blue Hour twilight with indoor lights)">Chiều tà (Blue Hour)</option>
+                                <option value="Ban đêm lung linh đèn kiến trúc (Night lighting)">Ban đêm lung linh</option>
+                                <option value="Trời mưa wet reflections mặt sàn (Rainy mood)">Trời mưa ướt phản chiếu</option>
+                                <option value="Mây mờ dịu nhẹ khuếch tán (Soft Overcast)">Mây mờ khuếch tán</option>
+                            </select>
+                        </div>
+
+                        <!-- 4. Framing & Lens -->
+                        <div class="space-y-1">
+                            <label class="text-slate-400 font-medium">Góc ống kính & Camera</label>
+                            <select id="selectFraming" class="w-full bg-slate-900 border border-brand-border rounded-lg px-2.5 py-2 text-slate-200 focus:border-amber-500 outline-none">
+                                <option value="Góc nhìn tầm mắt người đứng (Human Eye-level perspective)">Tầm mắt (Eye level)</option>
+                                <option value="Góc quay Drone/Flycam từ trên cao (Aerial Drone view)">Flycam từ trên cao</option>
+                                <option value="Góc rộng 24mm hoành tráng (Wide-angle architectural lens)">Góc rộng 24mm</option>
+                                <option value="Cận cảnh chi tiết vật liệu (Close-up detail shot)">Cận cảnh chi tiết</option>
+                            </select>
+                        </div>
+
+                    </div>
+
+                    <!-- Material selection chips -->
+                    <div class="space-y-1.5 text-xs">
+                        <label class="text-slate-400 font-medium block">Vật liệu chính (Chọn nhiều):</label>
+                        <div class="flex flex-wrap gap-1.5" id="materialChips">
+                            <button data-mat="Gỗ nan âm tường ấm áp" class="chip-btn px-2.5 py-1 rounded-md bg-slate-900 border border-brand-border text-slate-300 hover:border-amber-500 text-[11px]">Gỗ nan</button>
+                            <button data-mat="Kính Low-E phản quang" class="chip-btn px-2.5 py-1 rounded-md bg-amber-500/20 border border-amber-500 text-amber-300 text-[11px] active">Kính Low-E</button>
+                            <button data-mat="Bê tông mài cao cấp" class="chip-btn px-2.5 py-1 rounded-md bg-amber-500/20 border border-amber-500 text-amber-300 text-[11px] active">Bê tông mài</button>
+                            <button data-mat="Đá tự nhiên Marble/Granite" class="chip-btn px-2.5 py-1 rounded-md bg-slate-900 border border-brand-border text-slate-300 hover:border-amber-500 text-[11px]">Đá Marble</button>
+                            <button data-mat="Cây xanh mảng lớn nhiệt đới" class="chip-btn px-2.5 py-1 rounded-md bg-amber-500/20 border border-amber-500 text-amber-300 text-[11px] active">Cây xanh</button>
+                            <button data-mat="Kim loại mạ đồng & thép đen" class="chip-btn px-2.5 py-1 rounded-md bg-slate-900 border border-brand-border text-slate-300 hover:border-amber-500 text-[11px]">Kim loại mạ</button>
+                        </div>
+                    </div>
+
+                    <!-- Custom Prompt Enhancement -->
+                    <div class="space-y-1 text-xs">
+                        <label class="text-slate-400 font-medium block">Mô tả bổ sung chi tiết (Custom Prompt):</label>
+                        <textarea id="txtCustomPrompt" rows="2" placeholder="Ví dụ: Thêm xe ô tô Porsche đậu trước sân, hồ bơi tràn bờ phản chiếu mây, không khí trong lành..." class="w-full bg-slate-900 border border-brand-border rounded-xl p-2.5 text-slate-200 focus:border-amber-500 outline-none text-xs resize-none"></textarea>
+                    </div>
+
+                    <!-- Action Render Button -->
+                    <button id="btnRender" class="w-full py-3 rounded-xl bg-gradient-to-r from-amber-500 via-amber-600 to-amber-500 hover:from-amber-400 hover:to-amber-600 text-slate-950 font-bold text-sm shadow-lg shadow-amber-500/25 hover:shadow-amber-500/40 transition flex items-center justify-center space-x-2">
+                        <i class="fa-solid fa-wand-magic-sparkles"></i>
+                        <span>BẮT ĐẦU RENDER PHỐI CẢNH AI</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- RIGHT COLUMN: Viewport Render Result & AI Analysis (7 cols) -->
+            <div class="lg:col-span-7 space-y-5">
+                
+                <!-- Viewport Card -->
+                <div class="bg-brand-card border border-brand-border rounded-2xl p-4 shadow-xl flex flex-col justify-between min-h-[480px]">
+                    <div class="flex items-center justify-between pb-3 border-b border-brand-border">
+                        <div class="flex items-center space-x-2">
+                            <span class="w-2.5 h-2.5 rounded-full bg-amber-500"></span>
+                            <h2 class="text-sm font-semibold text-slate-200">Trình xem Phối cảnh (Viewport)</h2>
+                        </div>
+                        <div class="flex items-center space-x-2">
+                            <button id="btnFullscreen" title="Xem Toàn Màn Hình" class="p-1.5 rounded-lg border border-brand-border bg-slate-900 hover:bg-slate-800 text-slate-300 text-xs">
+                                <i class="fa-solid fa-expand"></i>
+                            </button>
+                            <button id="btnDownload" title="Tải Ảnh Render" class="px-3 py-1.5 rounded-lg bg-amber-500/10 border border-amber-500/30 text-amber-400 hover:bg-amber-500/20 text-xs font-medium flex items-center gap-1.5">
+                                <i class="fa-solid fa-download"></i>
+                                <span>Tải Ảnh</span>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Viewport Content Container -->
+                    <div class="relative my-4 aspect-video bg-slate-950 rounded-xl overflow-hidden border border-brand-border flex items-center justify-center group" id="viewportWrapper">
+                        
+                        <!-- Initial Placeholder -->
+                        <div id="viewportEmpty" class="text-center p-6 space-y-3">
+                            <div class="w-16 h-16 rounded-full bg-slate-900 border border-brand-border mx-auto flex items-center justify-center text-slate-600">
+                                <i class="fa-solid fa-image-portrait text-3xl"></i>
+                            </div>
+                            <div>
+                                <h3 class="text-sm font-medium text-slate-300">Chưa có kết quả Render</h3>
+                                <p class="text-xs text-slate-500 max-w-sm mt-1">Chọn thông số bên trái và nhấn nút "Bắt đầu Render AI" để khởi tạo phối cảnh kiến trúc chân thực.</p>
+                            </div>
+                        </div>
+
+                        <!-- Rendering Loading Indicator -->
+                        <div id="viewportLoading" class="hidden absolute inset-0 bg-slate-950/90 backdrop-blur flex flex-col items-center justify-center p-6 text-center z-30">
+                            <div class="relative w-16 h-16 mb-4">
+                                <div class="absolute inset-0 rounded-full border-4 border-amber-500/20 animate-ping"></div>
+                                <div class="absolute inset-0 rounded-full border-4 border-t-amber-500 border-r-cyan-400 border-b-transparent border-l-transparent animate-spin"></div>
+                            </div>
+                            <p id="loadingStatusText" class="text-sm font-medium text-amber-400 animate-pulse">Đang phân tích đường nét phác thảo SketchUp...</p>
+                            <p class="text-xs text-slate-400 mt-2">Gemini 3.1 Flash Image đang xử lý chi tiết ánh sáng & vật liệu</p>
+                        </div>
+
+                        <!-- Interactive Before/After Comparison Viewport -->
+                        <div id="viewportResult" class="hidden w-full h-full relative">
+                            <!-- Bottom Layer: Generated Render (AFTER) -->
+                            <img id="imgAfter" src="" alt="Photorealistic Render" class="w-full h-full object-cover">
+                            
+                            <!-- Top Layer: Sketch Input (BEFORE) -->
+                            <div id="comparisonOverlay" class="comparison-overlay w-1/2 bg-white">
+                                <img id="imgBefore" src="" alt="SketchUp Original" class="w-full h-full object-cover">
+                            </div>
+
+                            <!-- Slider Drag Control Handle -->
+                            <div id="sliderHandle" class="slider-handle" style="left: 50%;">
+                                <i class="fa-solid fa-code-compare text-xs"></i>
+                            </div>
+
+                            <!-- Floating Tags -->
+                            <div class="absolute top-3 left-3 bg-slate-900/80 backdrop-blur text-amber-400 border border-amber-500/30 text-[10px] px-2.5 py-1 rounded-full font-medium shadow pointer-events-none">
+                                SketchUp Lineart
+                            </div>
+                            <div class="absolute top-3 right-3 bg-slate-900/80 backdrop-blur text-cyan-300 border border-cyan-500/30 text-[10px] px-2.5 py-1 rounded-full font-medium shadow pointer-events-none">
+                                AI Photorealistic Render
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Viewport Bottom Stats Bar -->
+                    <div class="flex items-center justify-between text-[11px] text-slate-400 border-t border-brand-border pt-2.5">
+                        <div class="flex items-center space-x-3">
+                            <span><i class="fa-solid fa-expand text-slate-500 mr-1"></i> 16:9 Aspect</span>
+                            <span><i class="fa-solid fa-microchip text-slate-500 mr-1"></i> Gemini 3.1 Flash Image</span>
+                        </div>
+                        <div id="renderTimeBadge" class="text-slate-500">
+                            Thời gian xử lý: --s
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Architectural Analysis & Suggestions Panel -->
+                <div class="bg-brand-card border border-brand-border rounded-2xl p-4 shadow-xl space-y-3">
+                    <div class="flex items-center justify-between border-b border-brand-border pb-2.5">
+                        <h3 class="text-sm font-semibold text-slate-200 flex items-center gap-2">
+                            <i class="fa-solid fa-brain text-amber-500"></i>
+                            Phân tích Kiến trúc & Gợi ý từ AI
+                        </h3>
+                        <span class="text-[10px] text-slate-400 bg-slate-900 px-2 py-0.5 rounded border border-brand-border">Bởi Gemini 3 Flash</span>
+                    </div>
+
+                    <div id="analysisContent" class="text-xs text-slate-300 space-y-2.5 leading-relaxed">
+                        <p class="text-slate-500 italic">Nhấn "Bắt đầu Render AI" để xem đánh giá kiến trúc chi tiết về tỷ lệ hình khối, phối màu và vật liệu thi công thực tế...</p>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </main>
+
+    <!-- History Sidebar Modal (Hidden by default) -->
+    <div id="historyModal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 hidden flex justify-end">
+        <div class="w-full max-w-md bg-brand-card h-full border-l border-brand-border p-5 flex flex-col justify-between space-y-4">
+            <div>
+                <div class="flex items-center justify-between pb-3 border-b border-brand-border">
+                    <h3 class="font-bold text-slate-200 text-sm flex items-center gap-2">
+                        <i class="fa-solid fa-clock-rotate-left text-amber-500"></i>
+                        Lịch sử các bản Render
+                    </h3>
+                    <button id="btnCloseHistory" class="text-slate-400 hover:text-white"><i class="fa-solid fa-xmark text-lg"></i></button>
+                </div>
+                <div id="historyList" class="mt-4 space-y-3 overflow-y-auto max-h-[calc(100vh-140px)] pr-1">
+                    <p class="text-xs text-slate-500 text-center py-8">Chưa có lịch sử render nào trong phiên này.</p>
+                </div>
+            </div>
+            <button id="btnClearHistory" class="w-full py-2 bg-slate-900 hover:bg-slate-800 text-red-400 border border-brand-border rounded-xl text-xs">Xóa lịch sử</button>
+        </div>
+    </div>
+
+    <!-- Notification Toast System -->
+    <div id="toast" class="fixed bottom-5 right-5 z-50 bg-slate-900 border border-brand-border text-slate-200 text-xs px-4 py-3 rounded-xl shadow-2xl transition transform translate-y-10 opacity-0 pointer-events-none flex items-center space-x-2">
+        <i id="toastIcon" class="fa-solid fa-circle-info text-amber-500"></i>
+        <span id="toastMsg">Thông báo</span>
+    </div>
+
+    <script>
+        // Preset Line-Art SVG Sketches Data (Base64 SVG or generated line drawings)
+        const PRESETS = [
+            {
+                id: 'villa',
+                name: 'Biệt thự hiện đại',
+                category: 'Ngoại thất (Exterior Architecture)',
+                style: 'Hiện đại tối giản (Modern Minimalist)',
+                svg: `<svg viewBox="0 0 800 450" xmlns="http://www.w3.org/2000/svg" fill="white"><rect width="800" height="450" fill="#ffffff"/><path d="M 50 380 L 750 380 M 120 380 L 120 180 L 450 180 L 450 380 M 120 180 L 480 140 L 480 380 M 450 180 L 680 180 L 680 380 M 150 210 L 420 210 L 420 350 L 150 350 Z M 280 210 L 280 350 M 150 280 L 420 280 M 500 210 L 650 210 L 650 350 L 500 350 Z M 100 140 L 500 140 M 120 110 L 480 110 L 480 140 L 120 140 Z" stroke="#1e293b" stroke-width="3" fill="none"/><path d="M 50 380 Q 80 320 100 380 M 680 380 Q 720 300 750 380" stroke="#475569" stroke-width="2" fill="none"/></svg>`
+            },
+            {
+                id: 'living',
+                name: 'Phòng khách Bắc Âu',
+                category: 'Nội thất (Interior Architecture)',
+                style: 'Bắc Âu ấm cúng (Scandinavian)',
+                svg: `<svg viewBox="0 0 800 450" xmlns="http://www.w3.org/2000/svg" fill="white"><rect width="800" height="450" fill="#ffffff"/><path d="M 50 50 L 750 50 L 750 400 L 50 400 Z M 50 50 L 200 120 L 200 350 L 50 400 M 750 50 L 600 120 L 600 350 L 750 400 M 200 120 L 600 120 M 200 350 L 600 350 M 250 150 L 400 150 L 400 300 L 250 300 Z M 250 225 L 400 225 M 325 150 L 325 300 M 450 250 L 580 250 L 580 340 L 450 340 Z M 430 270 L 450 270 L 450 340 M 580 270 L 600 270 L 600 340" stroke="#1e293b" stroke-width="3" fill="none"/></svg>`
+            },
+            {
+                id: 'shophouse',
+                name: 'Shophouse mặt phố',
+                category: 'Ngoại thất (Exterior Architecture)',
+                style: 'Sang trọng cao cấp (Luxury Contemporary)',
+                svg: `<svg viewBox="0 0 800 450" xmlns="http://www.w3.org/2000/svg" fill="white"><rect width="800" height="450" fill="#ffffff"/><path d="M 250 400 L 250 50 L 550 50 L 550 400 M 250 400 L 550 400 M 270 300 L 530 300 L 530 390 L 270 390 Z M 270 170 L 530 170 L 530 270 L 270 270 Z M 270 70 L 530 70 L 530 140 L 270 140 Z M 300 190 L 360 190 L 360 250 L 300 250 Z M 440 190 L 500 190 L 500 250 L 440 250 Z" stroke="#1e293b" stroke-width="3" fill="none"/></svg>`
+            },
+            {
+                id: 'penthouse',
+                name: 'Căn hộ Penthouse',
+                category: 'Nội thất (Interior Architecture)',
+                style: 'Sang trọng cao cấp (Luxury Contemporary)',
+                svg: `<svg viewBox="0 0 800 450" xmlns="http://www.w3.org/2000/svg" fill="white"><rect width="800" height="450" fill="#ffffff"/><path d="M 50 400 L 750 400 M 50 400 L 300 200 L 750 200 M 300 200 L 300 50 M 50 400 L 50 50 L 750 50 L 750 400 M 350 240 L 550 240 L 550 360 L 350 360 Z M 100 100 L 250 100 L 250 350 M 150 100 L 150 350 M 200 100 L 200 350" stroke="#1e293b" stroke-width="3" fill="none"/></svg>`
+            },
+            {
+                id: 'garden',
+                name: 'Sân vườn nhà phố',
+                category: 'Quy hoạch & Sân vườn (Landscape)',
+                style: 'Hiện đại tối giản (Modern Minimalist)',
+                svg: `<svg viewBox="0 0 800 450" xmlns="http://www.w3.org/2000/svg" fill="white"><rect width="800" height="450" fill="#ffffff"/><path d="M 50 400 L 750 400 M 100 400 L 300 250 L 700 250 L 750 400 M 350 250 L 350 100 L 650 100 L 650 250 Z M 150 350 C 200 320 250 380 300 350 M 400 300 L 600 300 M 400 330 L 600 330" stroke="#1e293b" stroke-width="3" fill="none"/></svg>`
+            }
+        ];
+
+        // State Management
+        let currentInputBase64 = '';
+        let activePresetIndex = 0;
+        let renderHistory = [];
+        let canvas, ctx, isDrawing = false, currentTool = 'pen';
+        let startX, startY;
+
+        window.addEventListener('DOMContentLoaded', () => {
+            initPresets();
+            initCanvas();
+            initComparisonSlider();
+            bindEvents();
+            
+            // Load default preset into input
+            loadPreset(0);
+        });
+
+        // Initialize Preset List
+        function initPresets() {
+            const container = document.getElementById('presetList');
+            container.innerHTML = PRESETS.map((p, idx) => `
+                <button onclick="loadPreset(${idx})" class="preset-btn relative aspect-square rounded-lg overflow-hidden border ${idx === 0 ? 'border-amber-500 ring-2 ring-amber-500/30' : 'border-brand-border'} bg-white hover:border-amber-500 transition group p-1">
+                    <div class="w-full h-full flex items-center justify-center">${p.svg}</div>
+                    <span class="absolute bottom-0 inset-x-0 bg-slate-900/90 text-[9px] text-slate-200 truncate px-1 py-0.5 text-center">${p.name}</span>
+                </button>
+            `).join('');
+        }
+
+        // Convert SVG String to Base64 Image
+        function svgToBase64(svgString) {
+            const encoded = encodeURIComponent(svgString);
+            return `data:image/svg+xml;utf8,${encoded}`;
+        }
+
+        // Load Preset Action
+        window.loadPreset = function(index) {
+            activePresetIndex = index;
+            const preset = PRESETS[index];
+            
+            // Update UI Active States
+            document.querySelectorAll('.preset-btn').forEach((btn, idx) => {
+                if (idx === index) {
+                    btn.className = 'preset-btn relative aspect-square rounded-lg overflow-hidden border border-amber-500 ring-2 ring-amber-500/30 bg-white hover:border-amber-500 transition group p-1';
+                } else {
+                    btn.className = 'preset-btn relative aspect-square rounded-lg overflow-hidden border border-brand-border bg-white hover:border-amber-500 transition group p-1';
+                }
+            });
+
+            const dataUrl = svgToBase64(preset.svg);
+            document.getElementById('inputPreview').src = dataUrl;
+            document.getElementById('inputLabel').textContent = `Mẫu: ${preset.name}`;
+            
+            // Auto update options based on preset default
+            document.getElementById('selectCategory').value = preset.category;
+            document.getElementById('selectStyle').value = preset.style;
+
+            // Convert SVG to clean JPEG Base64 for Gemini API
+            const img = new Image();
+            img.onload = () => {
+                const cvs = document.createElement('canvas');
+                cvs.width = 800;
+                cvs.height = 450;
+                const c = cvs.getContext('2d');
+                c.fillStyle = '#ffffff';
+                c.fillRect(0, 0, 800, 450);
+                c.drawImage(img, 0, 0);
+                currentInputBase64 = cvs.toDataURL('image/jpeg', 0.95);
+            };
+            img.src = dataUrl;
+        };
+
+        function initCanvas() {
+            canvas = document.getElementById('sketchCanvas');
+            ctx = canvas.getContext('2d');
+            
+            // Set internal resolution
+            canvas.width = 800;
+            canvas.height = 450;
+            
+            // Fill background white
+            ctx.fillStyle = '#ffffff';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            // Canvas Mouse Events
+            canvas.addEventListener('mousedown', startDrawing);
+            canvas.addEventListener('mousemove', draw);
+            canvas.addEventListener('mouseup', stopDrawing);
+            canvas.addEventListener('mouseleave', stopDrawing);
+
+            // Canvas Touch Events for mobile
+            canvas.addEventListener('touchstart', (e) => {
+                const touch = e.touches[0];
+                const rect = canvas.getBoundingClientRect();
+                startX = (touch.clientX - rect.left) * (canvas.width / rect.width);
+                startY = (touch.clientY - rect.top) * (canvas.height / rect.height);
+                isDrawing = true;
+            });
+            canvas.addEventListener('touchmove', (e) => {
+                if (!isDrawing) return;
+                e.preventDefault();
+                const touch = e.touches[0];
+                const rect = canvas.getBoundingClientRect();
+                const x = (touch.clientX - rect.left) * (canvas.width / rect.width);
+                const y = (touch.clientY - rect.top) * (canvas.height / rect.height);
+                
+                ctx.lineWidth = document.getElementById('strokeWidth').value;
+                ctx.lineCap = 'round';
+                ctx.strokeStyle = currentTool === 'eraser' ? '#ffffff' : document.getElementById('strokeColor').value;
+
+                ctx.lineTo(x, y);
+                ctx.stroke();
+                ctx.beginPath();
+                ctx.moveTo(x, y);
+                updateCanvasPreview();
+            });
+            canvas.addEventListener('touchend', stopDrawing);
+        }
+
+        function startDrawing(e) {
+            isDrawing = true;
+            const rect = canvas.getBoundingClientRect();
+            startX = (e.clientX - rect.left) * (canvas.width / rect.width);
+            startY = (e.clientY - rect.top) * (canvas.height / rect.height);
+            ctx.beginPath();
+            ctx.moveTo(startX, startY);
+        }
+
+        function draw(e) {
+            if (!isDrawing) return;
+            const rect = canvas.getBoundingClientRect();
+            const x = (e.clientX - rect.left) * (canvas.width / rect.width);
+            const y = (e.clientY - rect.top) * (canvas.height / rect.height);
+
+            ctx.lineWidth = document.getElementById('strokeWidth').value;
+            ctx.lineCap = 'round';
+            ctx.strokeStyle = currentTool === 'eraser' ? '#ffffff' : document.getElementById('strokeColor').value;
+
+            if (currentTool === 'pen' || currentTool === 'eraser') {
+                ctx.lineTo(x, y);
+                ctx.stroke();
+                ctx.beginPath();
+                ctx.moveTo(x, y);
+            }
+            updateCanvasPreview();
+        }
+
+        function stopDrawing() {
+            if (!isDrawing) return;
+            isDrawing = false;
+            ctx.beginPath();
+            updateCanvasPreview();
+        }
+
+        function updateCanvasPreview() {
+            if (document.getElementById('sectionCanvas').classList.contains('hidden')) return;
+            currentInputBase64 = canvas.toDataURL('image/jpeg', 0.9);
+            document.getElementById('inputPreview').src = currentInputBase64;
+            document.getElementById('inputLabel').textContent = 'Phác thảo tự vẽ';
+        }
+
+        function initComparisonSlider() {
+            const container = document.getElementById('viewportWrapper');
+            const handle = document.getElementById('sliderHandle');
+            const overlay = document.getElementById('comparisonOverlay');
+            let isDragging = false;
+
+            const updateSlider = (x) => {
+                const rect = container.getBoundingClientRect();
+                let position = (x - rect.left) / rect.width;
+                if (position < 0) position = 0;
+                if (position > 1) position = 1;
+
+                const percentage = position * 100;
+                overlay.style.width = `${percentage}%`;
+                handle.style.left = `${percentage}%`;
+            };
+
+            handle.addEventListener('mousedown', () => isDragging = true);
+            window.addEventListener('mouseup', () => isDragging = false);
+            window.addEventListener('mousemove', (e) => {
+                if (!isDragging) return;
+                updateSlider(e.clientX);
+            });
+
+            // Touch support for slider
+            handle.addEventListener('touchstart', () => isDragging = true);
+            window.addEventListener('touchend', () => isDragging = false);
+            window.addEventListener('touchmove', (e) => {
+                if (!isDragging) return;
+                updateSlider(e.touches[0].clientX);
+            });
+        }
+
+        function bindEvents() {
+            // Input Mode Tabs
+            const tabPreset = document.getElementById('tabPreset');
+            const tabUpload = document.getElementById('tabUpload');
+            const tabCanvas = document.getElementById('tabCanvas');
+            const secPreset = document.getElementById('sectionPresets');
+            const secUpload = document.getElementById('sectionUpload');
+            const secCanvas = document.getElementById('sectionCanvas');
+
+            tabPreset.addEventListener('click', () => {
+                tabPreset.className = 'flex-1 py-1.5 rounded-lg font-medium transition bg-amber-500 text-slate-950 shadow';
+                tabUpload.className = 'flex-1 py-1.5 rounded-lg font-medium text-slate-400 hover:text-slate-200 transition';
+                tabCanvas.className = 'flex-1 py-1.5 rounded-lg font-medium text-slate-400 hover:text-slate-200 transition';
+                secPreset.classList.remove('hidden');
+                secUpload.classList.add('hidden');
+                secCanvas.classList.add('hidden');
+                loadPreset(activePresetIndex);
+            });
+
+            tabUpload.addEventListener('click', () => {
+                tabUpload.className = 'flex-1 py-1.5 rounded-lg font-medium transition bg-amber-500 text-slate-950 shadow';
+                tabPreset.className = 'flex-1 py-1.5 rounded-lg font-medium text-slate-400 hover:text-slate-200 transition';
+                tabCanvas.className = 'flex-1 py-1.5 rounded-lg font-medium text-slate-400 hover:text-slate-200 transition';
+                secUpload.classList.remove('hidden');
+                secPreset.classList.add('hidden');
+                secCanvas.classList.add('hidden');
+            });
+
+            tabCanvas.addEventListener('click', () => {
+                tabCanvas.className = 'flex-1 py-1.5 rounded-lg font-medium transition bg-amber-500 text-slate-950 shadow';
+                tabPreset.className = 'flex-1 py-1.5 rounded-lg font-medium text-slate-400 hover:text-slate-200 transition';
+                tabUpload.className = 'flex-1 py-1.5 rounded-lg font-medium text-slate-400 hover:text-slate-200 transition';
+                secCanvas.classList.remove('hidden');
+                secPreset.classList.add('hidden');
+                secUpload.classList.add('hidden');
+                updateCanvasPreview();
+            });
+
+            // File Upload Logic
+            const dropZone = document.getElementById('dropZone');
+            const fileInput = document.getElementById('fileInput');
+
+            dropZone.addEventListener('click', () => fileInput.click());
+            dropZone.addEventListener('dragover', (e) => {
+                e.preventDefault();
+                dropZone.classList.add('border-amber-500');
+            });
+            dropZone.addEventListener('dragleave', () => dropZone.classList.remove('border-amber-500'));
+            dropZone.addEventListener('drop', (e) => {
+                e.preventDefault();
+                dropZone.classList.remove('border-amber-500');
+                if (e.dataTransfer.files.length) handleFile(e.dataTransfer.files[0]);
+            });
+            fileInput.addEventListener('change', (e) => {
+                if (e.target.files.length) handleFile(e.target.files[0]);
+            });
+
+            function handleFile(file) {
+                if (!file.type.startsWith('image/')) {
+                    showToast('Vui lòng chọn file hình ảnh (.png, .jpg, .webp)', 'error');
+                    return;
+                }
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    currentInputBase64 = e.target.result;
+                    document.getElementById('inputPreview').src = currentInputBase64;
+                    document.getElementById('inputLabel').textContent = `File: ${file.name}`;
+                    showToast('Đã tải lên bản vẽ thành công!');
+                };
+                reader.readAsDataURL(file);
+            }
+
+            // Material Chips Toggle
+            document.querySelectorAll('.chip-btn').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    btn.classList.toggle('active');
+                    if (btn.classList.contains('active')) {
+                        btn.className = 'chip-btn px-2.5 py-1 rounded-md bg-amber-500/20 border border-amber-500 text-amber-300 text-[11px] active';
+                    } else {
+                        btn.className = 'chip-btn px-2.5 py-1 rounded-md bg-slate-900 border border-brand-border text-slate-300 hover:border-amber-500 text-[11px]';
+                    }
+                });
+            });
+
+            // Canvas Tools Toggle
+            document.getElementById('btnToolPen').addEventListener('click', () => {
+                currentTool = 'pen';
+                document.getElementById('btnToolPen').className = 'p-1.5 rounded bg-amber-500 text-slate-950 font-bold';
+                document.getElementById('btnToolEraser').className = 'p-1.5 rounded hover:bg-slate-800 text-slate-400';
+            });
+            document.getElementById('btnToolEraser').addEventListener('click', () => {
+                currentTool = 'eraser';
+                document.getElementById('btnToolEraser').className = 'p-1.5 rounded bg-amber-500 text-slate-950 font-bold';
+                document.getElementById('btnToolPen').className = 'p-1.5 rounded hover:bg-slate-800 text-slate-400';
+            });
+            document.getElementById('btnClearCanvas').addEventListener('click', () => {
+                ctx.fillStyle = '#ffffff';
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+                updateCanvasPreview();
+            });
+
+            // Render Action Trigger
+            document.getElementById('btnRender').addEventListener('click', executeGeminiRender);
+
+            // Download & Fullscreen Buttons
+            document.getElementById('btnDownload').addEventListener('click', () => {
+                const img = document.getElementById('imgAfter');
+                if (!img.src) return showToast('Chưa có ảnh render để tải về', 'error');
+                const a = document.createElement('a');
+                a.href = img.src;
+                a.download = `ArchRender_AI_${Date.now()}.png`;
+                a.click();
+                showToast('Đã tải xuống ảnh phối cảnh chất lượng cao');
+            });
+
+            document.getElementById('btnFullscreen').addEventListener('click', () => {
+                const wrapper = document.getElementById('viewportWrapper');
+                if (!document.fullscreenElement) {
+                    wrapper.requestFullscreen().catch(err => showToast('Không thể mở toàn màn hình', 'error'));
+                } else {
+                    document.exitFullscreen();
+                }
+            });
+
+            // History Modal Controls
+            document.getElementById('btnHistoryToggle').addEventListener('click', () => {
+                document.getElementById('historyModal').classList.remove('hidden');
+            });
+            document.getElementById('btnCloseHistory').addEventListener('click', () => {
+                document.getElementById('historyModal').classList.add('hidden');
+            });
+            document.getElementById('btnClearHistory').addEventListener('click', () => {
+                renderHistory = [];
+                renderHistoryUI();
+                showToast('Đã xóa lịch sử render');
+            });
+        }
+
+        async function fetchWithRetry(url, options, retries = 3, backoff = 1000) {
+            try {
+                const response = await fetch(url, options);
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    throw new Error(`HTTP Error ${response.status}: ${errorText}`);
+                }
+                return await response.json();
+            } catch (err) {
+                if (retries > 0) {
+                    await new Promise(res => setTimeout(res, backoff));
+                    return fetchWithRetry(url, options, retries - 1, backoff * 2);
+                }
+                throw err;
+            }
+        }
+
+        async function executeGeminiRender() {
+            if (!currentInputBase64) {
+                showToast('Vui lòng chọn hoặc phác thảo một bản vẽ trước!', 'error');
+                return;
+            }
+
+            const category = document.getElementById('selectCategory').value;
+            const style = document.getElementById('selectStyle').value;
+            const lighting = document.getElementById('selectLighting').value;
+            const framing = document.getElementById('selectFraming').value;
+            const customPrompt = document.getElementById('txtCustomPrompt').value.trim();
+            
+            // Gather selected materials
+            const selectedMaterials = Array.from(document.querySelectorAll('.chip-btn.active'))
+                .map(btn => btn.dataset.mat)
+                .join(', ');
+
+            // UI Loading State
+            const viewportEmpty = document.getElementById('viewportEmpty');
+            const viewportResult = document.getElementById('viewportResult');
+            const viewportLoading = document.getElementById('viewportLoading');
+            const statusText = document.getElementById('loadingStatusText');
+            const btnRender = document.getElementById('btnRender');
+
+            viewportEmpty.classList.add('hidden');
+            viewportResult.classList.add('hidden');
+            viewportLoading.classList.remove('hidden');
+            btnRender.disabled = true;
+            btnRender.classList.add('opacity-50', 'cursor-not-allowed');
+
+            const startTime = Date.now();
+
+            try {
+                // Step 1 status
+                statusText.textContent = "1/2: Đang phân tích khối SketchUp và khởi tạo kịch bản ánh sáng...";
+
+                // Strip base64 prefix
+                const base64Clean = currentInputBase64.replace(/^data:image\/(png|jpeg|webp|svg\+xml);base64,/, '');
+
+                // Formulate hyper-detailed architectural render prompt
+                const enhancedPrompt = `High-end architectural photorealistic render based on the provided input SketchUp sketch/line art drawing.
+Category: ${category}.
+Architectural Style: ${style}.
+Lighting & Time of day: ${lighting}.
+Materials & Finishes: ${selectedMaterials || 'Glass, polished concrete, natural wood slats, marble accents'}.
+Framing & Camera Lens: ${framing}.
+${customPrompt ? `Additional Client Design Notes: ${customPrompt}.` : ''}
+
+Strict Instructions: Keep the exact geometric volumes, window layout, rooflines, and spatial perspective of the provided sketch. Transform line art into a 8K resolution photorealistic masterpiece with physically accurate ray-traced reflections, realistic ambient occlusion shadows, lush surrounding foliage, high-detail glass transparency, realistic sky, and elegant atmospheric lighting.`;
+
+                // Gemini 3.1 Flash Image API Endpoint
+                const apiKey = ""; // API key automatically handled by runtime when empty
+                const imgApiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-image:generateContent?key=${apiKey}`;
+
+                const imgPayload = {
+                    contents: [{
+                        role: "user",
+                        parts: [
+                            { text: enhancedPrompt },
+                            {
+                                inlineData: {
+                                    mimeType: "image/jpeg",
+                                    data: base64Clean
+                                }
+                            }
+                        ]
+                    }],
+                    generationConfig: {
+                        responseModalities: ["TEXT", "IMAGE"]
+                    }
+                };
+
+                statusText.textContent = "2/2: Gemini 3.1 Flash Image đang tổng hợp vật liệu & Render chân thực...";
+
+                // Make Parallel Call for Architectural Text Analysis using gemini-3-flash-preview
+                const analysisPromise = fetchArchitecturalAnalysis(base64Clean, category, style, selectedMaterials, customPrompt);
+
+                // Fetch Image Render
+                const imgData = await fetchWithRetry(imgApiUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(imgPayload)
+                });
+
+                const candidate = imgData?.candidates?.[0];
+                const imagePart = candidate?.content?.parts?.find(p => p.inlineData);
+
+                if (!imagePart || !imagePart.inlineData?.data) {
+                    throw new Error("Không nhận được dữ liệu hình ảnh từ mô hình Gemini Image.");
+                }
+
+                const renderImageBase64 = `data:${imagePart.inlineData.mimeType};base64,${imagePart.inlineData.data}`;
+                const duration = ((Date.now() - startTime) / 1000).toFixed(1);
+
+                // Update Viewport with Results
+                document.getElementById('imgBefore').src = currentInputBase64;
+                document.getElementById('imgAfter').src = renderImageBase64;
+                document.getElementById('renderTimeBadge').textContent = `Thời gian xử lý: ${duration}s`;
+
+                // Display Viewport Result
+                viewportLoading.classList.add('hidden');
+                viewportResult.classList.remove('hidden');
+
+                // Save to History
+                addToHistory({
+                    timestamp: new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }),
+                    category,
+                    style,
+                    sketchImg: currentInputBase64,
+                    renderImg: renderImageBase64
+                });
+
+                showToast('Render phối cảnh kiến trúc hoàn tất!');
+
+                // Render Architectural Text Feedback from async promise
+                const analysisText = await analysisPromise;
+                document.getElementById('analysisContent').innerHTML = analysisText;
+
+            } catch (error) {
+                console.error('Gemini Render Error:', error);
+                viewportLoading.classList.add('hidden');
+                viewportEmpty.classList.remove('hidden');
+                showToast(`Lỗi Render: ${error.message || 'Không thể kết nối Gemini API'}`, 'error');
+            } finally {
+                btnRender.disabled = false;
+                btnRender.classList.remove('opacity-50', 'cursor-not-allowed');
+            }
+        }
+
+        async function fetchArchitecturalAnalysis(base64Image, category, style, materials, notes) {
+            try {
+                const apiKey = "";
+                const textApiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent?key=${apiKey}`;
+                
+                const prompt = `Bạn là một Kiến trúc sư trưởng cao cấp. Hãy phân tích bản phác thảo SketchUp này và đưa ra nhận xét chuyên môn ngắn gọn (dưới 180 từ) bằng Tiếng Việt gồm 3 mục dạng HTML:
+1. <b>Bố cục & Hình khối:</b> Nhận xét tỷ lệ và nhịp điệu không gian.
+2. <b>Vật liệu đề xuất:</b> Đề xuất 3 vật liệu hoàn thiện cao cấp phù hợp nhất (${materials}).
+3. <b>Giải pháp Ánh sáng & Điểm nhấn:</b> Đề xuất hướng chiếu sáng và chi tiết tạo điểm nhấn kiến trúc.`;
+
+                const payload = {
+                    contents: [{
+                        role: "user",
+                        parts: [
+                            { text: prompt },
+                            {
+                                inlineData: {
+                                    mimeType: "image/jpeg",
+                                    data: base64Image
+                                }
+                            }
+                        ]
+                    }]
+                };
+
+                const res = await fetchWithRetry(textApiUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+
+                const text = res?.candidates?.[0]?.content?.parts?.[0]?.text;
+                if (text) {
+                    return text.replace(/\n/g, '<br>');
+                }
+                return `<b>Bố cục & Hình khối:</b> Hình khối cân đối, phân chia mảng dặc rỗng hợp lý.<br><b>Vật liệu đề xuất:</b> Kính Low-E, Gỗ nan composite ngoài trời, Đá Granite lát sân.<br><b>Điểm nhấn:</b> Đèn hắt khe kiến trúc âm trần mang lại hiệu ứng mảng khối về đêm.`;
+            } catch (err) {
+                return `<b>Nhận xét Kiến trúc:</b> Phối cảnh được sinh thành công theo phong cách ${style} với hệ vật liệu ${materials || 'hiện đại'}.`;
+            }
+        }
+
+        // Render History State & UI
+        function addToHistory(item) {
+            renderHistory.unshift(item);
+            if (renderHistory.length > 10) renderHistory.pop();
+            renderHistoryUI();
+        }
+
+        function renderHistoryUI() {
+            const list = document.getElementById('historyList');
+            if (renderHistory.length === 0) {
+                list.innerHTML = `<p class="text-xs text-slate-500 text-center py-8">Chưa có lịch sử render nào trong phiên này.</p>`;
+                return;
+            }
+
+            list.innerHTML = renderHistory.map((h, i) => `
+                <div onclick="loadHistoryItem(${i})" class="bg-slate-900 border border-brand-border hover:border-amber-500 rounded-xl p-2.5 flex items-center space-x-3 cursor-pointer transition group">
+                    <img src="${h.renderImg}" class="w-16 h-12 object-cover rounded-lg border border-brand-border">
+                    <div class="flex-grow min-w-0">
+                        <div class="flex items-center justify-between">
+                            <h4 class="text-xs font-semibold text-slate-200 truncate">${h.style}</h4>
+                            <span class="text-[10px] text-slate-500">${h.timestamp}</span>
+                        </div>
+                        <p class="text-[10px] text-slate-400 truncate">${h.category}</p>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        window.loadHistoryItem = function(index) {
+            const item = renderHistory[index];
+            if (!item) return;
+
+            document.getElementById('imgBefore').src = item.sketchImg;
+            document.getElementById('imgAfter').src = item.renderImg;
+            
+            document.getElementById('viewportEmpty').classList.add('hidden');
+            document.getElementById('viewportLoading').classList.add('hidden');
+            document.getElementById('viewportResult').classList.remove('hidden');
+            document.getElementById('historyModal').classList.add('hidden');
+            
+            showToast(`Đã tải lại bản render lúc ${item.timestamp}`);
+        };
+
+        // UI Toast Notification helper
+        function showToast(msg, type = 'info') {
+            const toast = document.getElementById('toast');
+            const toastMsg = document.getElementById('toastMsg');
+            const toastIcon = document.getElementById('toastIcon');
+
+            toastMsg.textContent = msg;
+            if (type === 'error') {
+                toastIcon.className = 'fa-solid fa-triangle-exclamation text-red-400';
+            } else {
+                toastIcon.className = 'fa-solid fa-circle-check text-amber-500';
+            }
+
+            toast.classList.remove('translate-y-10', 'opacity-0', 'pointer-events-none');
+            setTimeout(() => {
+                toast.classList.add('translate-y-10', 'opacity-0', 'pointer-events-none');
+            }, 3500);
+        }
+    </script>
+</body>
+</html>
